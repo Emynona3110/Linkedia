@@ -51,21 +51,6 @@ class LinkediaApp:
         self.appearance_mode_optionmenu.grid(row=7, column=0, padx=20, pady=(10, 10))
         self.appearance_mode_optionmenu.set("System")
 
-        self.scaling_label = ctk.CTkLabel(
-            self.sidebar_frame,
-            text="UI Scaling :",
-            anchor="w",
-        )
-        self.scaling_label.grid(row=8, column=0, padx=20, pady=(10, 0))
-
-        self.scaling_optionmenu = ctk.CTkOptionMenu(
-            self.sidebar_frame,
-            values=["80%", "90%", "100%", "110%", "120%"],
-            command=self.change_scaling_event,
-        )
-        self.scaling_optionmenu.grid(row=9, column=0, padx=20, pady=(10, 20))
-        self.scaling_optionmenu.set("100%")
-
         self.content_frame = ctk.CTkFrame(self.root, fg_color="transparent")
         self.content_frame.grid(row=0, column=1, rowspan=4, sticky="nsew", padx=20, pady=20)
         self.content_frame.grid_columnconfigure(0, weight=1)
@@ -139,10 +124,6 @@ class LinkediaApp:
     def change_appearance_mode_event(self, new_mode: str):
         ctk.set_appearance_mode(new_mode)
 
-    def change_scaling_event(self, new_scaling: str):
-        value = int(new_scaling.replace("%", "")) / 100
-        ctk.set_widget_scaling(value)
-
     def clear_results(self):
         for widget in self.results_container.winfo_children():
             widget.destroy()
@@ -170,7 +151,6 @@ class LinkediaApp:
         card.grid_columnconfigure(0, weight=1)
 
         title = entry.get("title") or entry.get("url") or ""
-        url = entry.get("url") or ""
         description = entry.get("description") or ""
 
         title_label = ctk.CTkLabel(
@@ -201,24 +181,32 @@ class LinkediaApp:
         )
         score_label.grid(row=2, column=0, padx=10, pady=(0, 6), sticky="w")
 
-        close_button = ctk.CTkButton(
+        close_label = ctk.CTkLabel(
             card,
-            text="❌",
-            width=28,
-            height=24,
-            fg_color="transparent",
-            border_width=0,
-            hover_color=("gray80", "gray30"),
-            command=lambda u=url: self.ask_delete_url(u),
+            text="×",
+            width=12,
+            font=ctk.CTkFont(size=20),
+            text_color=("gray50", "gray50"),
         )
-        close_button.grid(row=0, column=1, padx=8, pady=6, sticky="ne")
+        close_label.grid(row=0, column=1, padx=8, pady=6, sticky="ne")
+
+        def on_enter(e):
+            mode = ctk.get_appearance_mode()
+            if mode == "Dark":
+                close_label.configure(text_color="white")
+            else:
+                close_label.configure(text_color="black")
+
+        def on_leave(e):
+            close_label.configure(text_color=("gray50", "gray50"))
+
+        close_label.bind("<Enter>", on_enter)
+        close_label.bind("<Leave>", on_leave)
+        close_label.bind("<Button-1>", lambda e, u=entry["url"]: self.ask_delete_url(u))
 
         def on_click(event):
             self.select_card(index)
             self.open_selected()
-
-        def on_select_only(event):
-            self.select_card(index)
 
         for widget in (card, title_label):
             widget.bind("<Button-1>", on_click)
@@ -228,7 +216,7 @@ class LinkediaApp:
             desc_label.bind("<Button-1>", on_click)
             desc_label.bind("<Double-Button-1>", on_click)
 
-        score_label.bind("<Button-1>", on_select_only)
+        score_label.bind("<Button-1>", lambda e: self.select_card(index))
 
         self.result_cards.append(card)
         self.update_card_styles()
@@ -258,17 +246,15 @@ class LinkediaApp:
 
         values_iter = []
         if isinstance(entries, dict):
-            values_iter = list(entries.values())
+            values_iter = list(entries.values())[::-1]
         elif isinstance(entries, (list, tuple, set)):
-            entries = list(entries)
-            if entries:
-                first = entries[0]
-                if isinstance(first, dict):
-                    values_iter = entries
-                elif isinstance(first, (list, tuple)) and len(first) >= 2 and isinstance(first[1], dict):
-                    values_iter = [e[1] for e in entries]
-                else:
-                    values_iter = entries
+            tmp = list(entries)
+            if tmp and isinstance(tmp[0], dict):
+                values_iter = tmp[::-1]
+            elif tmp and isinstance(tmp[0], (list, tuple)) and len(tmp[0]) >= 2:
+                values_iter = [e[1] for e in tmp[::-1]]
+            else:
+                values_iter = tmp[::-1]
         else:
             values_iter = [entries]
 
@@ -346,46 +332,48 @@ class LinkediaApp:
         dialog.title("Confirmation")
         dialog.resizable(False, False)
 
-        dialog_width, dialog_height = 340, 150
-        self.root.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (dialog_width // 2)
-        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (dialog_height // 2)
-        dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        try:
+            dialog._apply_appearance_mode()
+            dialog._corner_radius = 8
+            dialog._border_width = 0
+        except:
+            pass
+
+        dialog.update_idletasks()
+        dialog.geometry("300x120")
+
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 150
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 60
+        dialog.geometry(f"300x120+{x}+{y}")
 
         dialog.grab_set()
 
-        container = ctk.CTkFrame(dialog, fg_color="transparent")
-        container.pack(fill="both", expand=True)
-
         label = ctk.CTkLabel(
-            container,
+            dialog,
             text="Voulez-vous vraiment supprimer ce site ?",
             justify="center",
             anchor="center",
-            wraplength=300,
+            wraplength=260,
         )
-        label.pack(pady=(25, 15))
-
-        buttons_frame = ctk.CTkFrame(container, fg_color="transparent")
-        buttons_frame.pack(pady=(0, 15))
+        label.pack(pady=(15, 10))
 
         cancel_button = ctk.CTkButton(
-            buttons_frame,
+            dialog,
             text="Annuler",
-            width=110,
+            width=95,
             command=dialog.destroy,
         )
-        cancel_button.grid(row=0, column=0, padx=10)
+        cancel_button.pack(side="left", padx=(40, 10), pady=(0, 15))
 
         delete_button = ctk.CTkButton(
-            buttons_frame,
+            dialog,
             text="Supprimer",
-            width=110,
+            width=95,
             fg_color="#b33939",
             hover_color="#922b21",
             command=lambda: self._confirm_delete(dialog, url),
         )
-        delete_button.grid(row=0, column=1, padx=10)
+        delete_button.pack(side="right", padx=(10, 40), pady=(0, 15))
 
     def _confirm_delete(self, dialog: ctk.CTkToplevel, url: str):
         try:
