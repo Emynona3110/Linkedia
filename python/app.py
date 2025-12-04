@@ -1,90 +1,413 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
 import webbrowser
+from tkinter import messagebox
+
+import customtkinter as ctk
 
 from scraper import scrape
 from storage import add_or_update_entry, delete_entry, list_entries, get_entry
 from search import search
 
+
+ctk.set_appearance_mode("System")
+ctk.set_default_color_theme("blue")
+
+
 class LinkediaApp:
-    def __init__(self, root):
+    def __init__(self, root: ctk.CTk):
         self.root = root
         self.root.title("Linkedia")
-        self.root.geometry("900x600")
+        self.root.geometry("1100x580")
 
-        add_frame = ttk.LabelFrame(root, text="Ajouter / Mettre à jour un site")
-        add_frame.pack(fill="x", padx=10, pady=10)
+        self.current_results = []
+        self.result_cards = []
+        self.selected_index = None
 
-        self.url_entry = ttk.Entry(add_frame)
-        self.url_entry.pack(side="left", fill="x", expand=True, padx=5, pady=5)
+        self.root.grid_columnconfigure(1, weight=1)
+        self.root.grid_rowconfigure((0, 1, 2), weight=1)
 
-        add_button = ttk.Button(add_frame, text="Ajouter", command=self.add_url)
-        add_button.pack(side="left", padx=5)
+        self.sidebar_frame = ctk.CTkFrame(self.root, width=140, corner_radius=0)
+        self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
+        self.sidebar_frame.grid_rowconfigure(5, weight=1)
 
-        search_frame = ttk.LabelFrame(root, text="Recherche")
-        search_frame.pack(fill="x", padx=10, pady=10)
+        self.logo_label = ctk.CTkLabel(
+            self.sidebar_frame,
+            text="Linkedia",
+            font=ctk.CTkFont(size=20, weight="bold"),
+        )
+        self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
-        self.search_entry = ttk.Entry(search_frame)
-        self.search_entry.pack(side="left", fill="x", expand=True, padx=5, pady=5)
+        self.appearance_mode_label = ctk.CTkLabel(
+            self.sidebar_frame,
+            text="Apparence :",
+            anchor="w",
+        )
+        self.appearance_mode_label.grid(row=6, column=0, padx=20, pady=(10, 0))
 
-        search_button = ttk.Button(search_frame, text="Chercher", command=self.search_query)
-        search_button.pack(side="left", padx=5)
+        self.appearance_mode_optionmenu = ctk.CTkOptionMenu(
+            self.sidebar_frame,
+            values=["Light", "Dark", "System"],
+            command=self.change_appearance_mode_event,
+        )
+        self.appearance_mode_optionmenu.grid(row=7, column=0, padx=20, pady=(10, 10))
+        self.appearance_mode_optionmenu.set("System")
 
-        results_frame = ttk.LabelFrame(root, text="Résultats")
-        results_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self.scaling_label = ctk.CTkLabel(
+            self.sidebar_frame,
+            text="UI Scaling :",
+            anchor="w",
+        )
+        self.scaling_label.grid(row=8, column=0, padx=20, pady=(10, 0))
 
-        self.results_list = tk.Listbox(results_frame, font=("Segoe UI", 11))
-        self.results_list.pack(fill="both", expand=True, padx=5, pady=5)
-        self.results_list.bind("<Double-Button-1>", self.open_selected)
+        self.scaling_optionmenu = ctk.CTkOptionMenu(
+            self.sidebar_frame,
+            values=["80%", "90%", "100%", "110%", "120%"],
+            command=self.change_scaling_event,
+        )
+        self.scaling_optionmenu.grid(row=9, column=0, padx=20, pady=(10, 20))
+        self.scaling_optionmenu.set("100%")
 
-        delete_btn = ttk.Button(root, text="Supprimer le site sélectionné", command=self.delete_selected)
-        delete_btn.pack(pady=5)
+        self.content_frame = ctk.CTkFrame(self.root, fg_color="transparent")
+        self.content_frame.grid(row=0, column=1, rowspan=4, sticky="nsew", padx=20, pady=20)
+        self.content_frame.grid_columnconfigure(0, weight=1)
+        self.content_frame.grid_rowconfigure(2, weight=1)
+
+        self.add_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        self.add_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        self.add_frame.grid_columnconfigure(1, weight=1)
+
+        self.add_title_label = ctk.CTkLabel(
+            self.add_frame,
+            text="Ajouter / Mettre à jour un site",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        )
+        self.add_title_label.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 5))
+
+        self.url_label = ctk.CTkLabel(self.add_frame, text="URL :")
+        self.url_label.grid(row=1, column=0, padx=(0, 10), sticky="w")
+
+        self.url_entry = ctk.CTkEntry(self.add_frame)
+        self.url_entry.grid(row=1, column=1, padx=(0, 10), pady=(0, 5), sticky="ew")
+        self.url_entry.bind("<Return>", lambda e: self.add_url())
+
+        self.add_button = ctk.CTkButton(
+            self.add_frame,
+            text="Ajouter / Mettre à jour",
+            command=self.add_url,
+        )
+        self.add_button.grid(row=1, column=2, sticky="e")
+
+        self.search_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        self.search_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+        self.search_frame.grid_columnconfigure(0, weight=1)
+
+        self.search_title_label = ctk.CTkLabel(
+            self.search_frame,
+            text="Rechercher dans la base",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        )
+        self.search_title_label.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+
+        self.search_entry = ctk.CTkEntry(self.search_frame)
+        self.search_entry.grid(row=1, column=0, padx=(0, 10), sticky="ew")
+        self.search_entry.bind("<Return>", lambda e: self.search_query())
+
+        self.search_button = ctk.CTkButton(
+            self.search_frame,
+            text="Chercher",
+            command=self.search_query,
+        )
+        self.search_button.grid(row=1, column=1, sticky="e")
+
+        self.results_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        self.results_frame.grid(row=2, column=0, sticky="nsew")
+        self.results_frame.grid_columnconfigure(0, weight=1)
+        self.results_frame.grid_rowconfigure(1, weight=1)
+
+        self.results_label = ctk.CTkLabel(
+            self.results_frame,
+            text="Résultats",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        )
+        self.results_label.grid(row=0, column=0, sticky="w", pady=(0, 5))
+
+        self.results_container = ctk.CTkScrollableFrame(self.results_frame)
+        self.results_container.grid(row=1, column=0, sticky="nsew")
+        self.results_container.grid_columnconfigure(0, weight=1)
+
+        self.refresh_list()
+
+    def change_appearance_mode_event(self, new_mode: str):
+        ctk.set_appearance_mode(new_mode)
+
+    def change_scaling_event(self, new_scaling: str):
+        value = int(new_scaling.replace("%", "")) / 100
+        ctk.set_widget_scaling(value)
+
+    def clear_results(self):
+        for widget in self.results_container.winfo_children():
+            widget.destroy()
+        self.result_cards = []
+        self.current_results = []
+        self.selected_index = None
+
+    def normalize_entry(self, raw):
+        if isinstance(raw, dict):
+            title = raw.get("title") or raw.get("url") or ""
+            url = raw.get("url") or ""
+            description = raw.get("description") or ""
+            return {"title": title, "url": url, "description": description}
+
+        key = str(raw)
+        entry = get_entry(key)
+        if isinstance(entry, dict):
+            return self.normalize_entry(entry)
+
+        return {"title": key, "url": key, "description": ""}
+
+    def create_result_card(self, index: int, score: float, entry: dict):
+        card = ctk.CTkFrame(self.results_container, corner_radius=10)
+        card.grid(row=index, column=0, padx=4, pady=4, sticky="ew")
+        card.grid_columnconfigure(0, weight=1)
+
+        title = entry.get("title") or entry.get("url") or ""
+        url = entry.get("url") or ""
+        description = entry.get("description") or ""
+
+        title_label = ctk.CTkLabel(
+            card,
+            text=title,
+            anchor="w",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        )
+        title_label.grid(row=0, column=0, padx=10, pady=(6, 0), sticky="w")
+
+        if description:
+            short_desc = description.strip()
+            if len(short_desc) > 140:
+                short_desc = short_desc[:137] + "..."
+            desc_label = ctk.CTkLabel(
+                card,
+                text=short_desc,
+                anchor="w",
+                font=ctk.CTkFont(size=10),
+            )
+            desc_label.grid(row=1, column=0, padx=10, pady=(0, 6), sticky="w")
+
+        score_label = ctk.CTkLabel(
+            card,
+            text=f"{score:.1f} %",
+            anchor="w",
+            font=ctk.CTkFont(size=10),
+        )
+        score_label.grid(row=2, column=0, padx=10, pady=(0, 6), sticky="w")
+
+        close_button = ctk.CTkButton(
+            card,
+            text="❌",
+            width=28,
+            height=24,
+            fg_color="transparent",
+            border_width=0,
+            hover_color=("gray80", "gray30"),
+            command=lambda u=url: self.ask_delete_url(u),
+        )
+        close_button.grid(row=0, column=1, padx=8, pady=6, sticky="ne")
+
+        def on_click(event):
+            self.select_card(index)
+            self.open_selected()
+
+        def on_select_only(event):
+            self.select_card(index)
+
+        for widget in (card, title_label):
+            widget.bind("<Button-1>", on_click)
+            widget.bind("<Double-Button-1>", on_click)
+
+        if description:
+            desc_label.bind("<Button-1>", on_click)
+            desc_label.bind("<Double-Button-1>", on_click)
+
+        score_label.bind("<Button-1>", on_select_only)
+
+        self.result_cards.append(card)
+        self.update_card_styles()
+
+    def update_card_styles(self):
+        for idx, card in enumerate(self.result_cards):
+            if idx == self.selected_index:
+                card.configure(fg_color=("gray80", "gray25"))
+            else:
+                card.configure(fg_color=("gray90", "gray15"))
+
+    def select_card(self, index: int):
+        if index < 0 or index >= len(self.current_results):
+            return
+        self.selected_index = index
+        self.update_card_styles()
+
+    def _scroll_to_top(self):
+        try:
+            self.results_container._parent_canvas.yview_moveto(0)
+        except Exception:
+            pass
+
+    def refresh_list(self):
+        entries = list_entries()
+        self.clear_results()
+
+        values_iter = []
+        if isinstance(entries, dict):
+            values_iter = list(entries.values())
+        elif isinstance(entries, (list, tuple, set)):
+            entries = list(entries)
+            if entries:
+                first = entries[0]
+                if isinstance(first, dict):
+                    values_iter = entries
+                elif isinstance(first, (list, tuple)) and len(first) >= 2 and isinstance(first[1], dict):
+                    values_iter = [e[1] for e in entries]
+                else:
+                    values_iter = entries
+        else:
+            values_iter = [entries]
+
+        for raw in values_iter:
+            data = self.normalize_entry(raw)
+            self.current_results.append((0.0, data))
+            index = len(self.current_results) - 1
+            self.create_result_card(index, 0.0, data)
+
+        self._scroll_to_top()
 
     def add_url(self):
         url = self.url_entry.get().strip()
         if not url:
-            return messagebox.showwarning("Erreur", "Veuillez entrer une URL.")
+            messagebox.showwarning("Erreur", "Veuillez entrer une URL.")
+            return
         existing = get_entry(url)
         if existing:
-            if not messagebox.askyesno("Déjà indexé", "Cette URL existe déjà. Mettre à jour ?"):
+            if not messagebox.askyesno(
+                "Déjà indexé",
+                "Cette URL existe déjà. Mettre à jour ?",
+            ):
                 return
         data = scrape(url)
         if not data:
-            return messagebox.showerror("Erreur", "Impossible de scraper l'URL.")
+            messagebox.showerror("Erreur", "Impossible de scraper l'URL.")
+            return
         add_or_update_entry(data)
-        messagebox.showinfo("Succès", "Site ajouté / mis à jour.")
+        self.url_entry.delete(0, "end")
+        query = self.search_entry.get().strip()
+        if query:
+            self.search_query()
+        else:
+            self.refresh_list()
 
     def search_query(self):
         query = self.search_entry.get().strip()
         if not query:
+            self.refresh_list()
             return
         results = search(query)
-        self.results_list.delete(0, tk.END)
+        self.clear_results()
         for score, entry in results:
-            title = entry["title"] or entry["url"]
-            self.results_list.insert(tk.END, f"{score}% │ {title} │ {entry['url']}")
+            data = self.normalize_entry(entry)
+            self.current_results.append((score, data))
+            index = len(self.current_results) - 1
+            self.create_result_card(index, score, data)
+        self._scroll_to_top()
+
+    def get_selected_url(self):
+        if self.selected_index is None:
+            messagebox.showwarning("Erreur", "Aucun élément sélectionné.")
+            return None
+        if self.selected_index < 0 or self.selected_index >= len(self.current_results):
+            messagebox.showerror("Erreur", "Sélection invalide.")
+            return None
+        _, entry = self.current_results[self.selected_index]
+        url = entry.get("url")
+        if not url:
+            messagebox.showerror("Erreur", "URL introuvable pour cette entrée.")
+            return None
+        return url
 
     def open_selected(self, event=None):
-        selection = self.results_list.curselection()
-        if not selection:
+        url = self.get_selected_url()
+        if not url:
             return
-        text = self.results_list.get(selection[0])
-        url = text.split("│")[-1].strip()
         webbrowser.open(url)
 
+    def ask_delete_url(self, url: str):
+        if not url:
+            return
+
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title("Confirmation")
+        dialog.resizable(False, False)
+
+        dialog_width, dialog_height = 340, 150
+        self.root.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (dialog_width // 2)
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (dialog_height // 2)
+        dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+
+        dialog.grab_set()
+
+        container = ctk.CTkFrame(dialog, fg_color="transparent")
+        container.pack(fill="both", expand=True)
+
+        label = ctk.CTkLabel(
+            container,
+            text="Voulez-vous vraiment supprimer ce site ?",
+            justify="center",
+            anchor="center",
+            wraplength=300,
+        )
+        label.pack(pady=(25, 15))
+
+        buttons_frame = ctk.CTkFrame(container, fg_color="transparent")
+        buttons_frame.pack(pady=(0, 15))
+
+        cancel_button = ctk.CTkButton(
+            buttons_frame,
+            text="Annuler",
+            width=110,
+            command=dialog.destroy,
+        )
+        cancel_button.grid(row=0, column=0, padx=10)
+
+        delete_button = ctk.CTkButton(
+            buttons_frame,
+            text="Supprimer",
+            width=110,
+            fg_color="#b33939",
+            hover_color="#922b21",
+            command=lambda: self._confirm_delete(dialog, url),
+        )
+        delete_button.grid(row=0, column=1, padx=10)
+
+    def _confirm_delete(self, dialog: ctk.CTkToplevel, url: str):
+        try:
+            if delete_entry(url):
+                query = self.search_entry.get().strip()
+                if query:
+                    self.search_query()
+                else:
+                    self.refresh_list()
+            else:
+                messagebox.showerror("Erreur", "Impossible de supprimer.")
+        finally:
+            dialog.destroy()
+
     def delete_selected(self):
-        selection = self.results_list.curselection()
-        if not selection:
-            return messagebox.showwarning("Erreur", "Aucun élément sélectionné.")
-        text = self.results_list.get(selection[0])
-        url = text.split("│")[-1].strip()
-        if delete_entry(url):
-            messagebox.showinfo("Supprimé", "Entrée supprimée.")
-            self.search_query()
-        else:
-            messagebox.showerror("Erreur", "Impossible de supprimer.")
+        url = self.get_selected_url()
+        if not url:
+            return
+        self.ask_delete_url(url)
+
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = ctk.CTk()
     app = LinkediaApp(root)
     root.mainloop()
