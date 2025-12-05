@@ -177,19 +177,23 @@ class LinkediaApp:
         self.update_card_styles()
         self._scroll_to_top()
 
+    def normalize_url(self, url: str) -> str:
+        url = url.strip()
+        if not url:
+            return ""
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = "https://" + url
+        return url
+
     def add_url(self):
         url = self.url_entry.get().strip()
         if not url:
             messagebox.showwarning("Erreur", "Veuillez entrer une URL.")
             return
 
+        url = self.normalize_url(url)
+
         existing = get_entry(url)
-        if existing:
-            if not messagebox.askyesno(
-                "Déjà indexé",
-                "Cette URL existe déjà. Mettre à jour ?",
-            ):
-                return
 
         data = scrape(url)
 
@@ -209,6 +213,7 @@ class LinkediaApp:
             self.search_query()
         else:
             self.refresh_list()
+
 
     def search_query(self):
         query = self.search_entry.get().strip()
