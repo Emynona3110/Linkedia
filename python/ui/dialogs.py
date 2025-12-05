@@ -58,3 +58,42 @@ def _confirm_and_close(dialog: ctk.CTkToplevel, url: str, on_confirm):
         on_confirm(url)
     finally:
         dialog.destroy()
+
+
+def ask_error_dialog(root: ctk.CTk, message: str):
+    dialog = ctk.CTkToplevel(root)
+    dialog.title("Erreur")
+    dialog.resizable(False, False)
+
+    try:
+        dialog._apply_appearance_mode()
+        dialog._corner_radius = 8
+        dialog._border_width = 0
+    except Exception:
+        pass
+
+    dialog.update_idletasks()
+    dialog.geometry("300x120")
+
+    x = root.winfo_x() + (root.winfo_width() // 2) - 150
+    y = root.winfo_y() + (root.winfo_height() // 2) - 60
+    dialog.geometry(f"300x120+{x}+{y}")
+
+    dialog.grab_set()
+
+    label = ctk.CTkLabel(
+        dialog,
+        text=message,
+        justify="center",
+        anchor="center",
+        wraplength=260,
+    )
+    label.pack(pady=(20, 15))
+
+    ok_button = ctk.CTkButton(
+        dialog,
+        text="OK",
+        width=120,
+        command=dialog.destroy,
+    )
+    ok_button.pack(pady=(0, 10))

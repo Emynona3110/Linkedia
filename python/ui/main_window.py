@@ -8,7 +8,7 @@ from core.data_manager import add_or_update_entry, list_entries, get_entry, dele
 from core.search_engine import search
 from core.normalization import normalize_entry
 from ui.cards import ResultCard
-from ui.dialogs import ask_delete_dialog
+from ui.dialogs import ask_delete_dialog, ask_error_dialog
 
 
 class LinkediaApp:
@@ -182,6 +182,7 @@ class LinkediaApp:
         if not url:
             messagebox.showwarning("Erreur", "Veuillez entrer une URL.")
             return
+
         existing = get_entry(url)
         if existing:
             if not messagebox.askyesno(
@@ -189,12 +190,20 @@ class LinkediaApp:
                 "Cette URL existe déjà. Mettre à jour ?",
             ):
                 return
+
         data = scrape(url)
-        if not data:
-            messagebox.showerror("Erreur", "Impossible de scraper l'URL.")
-            return
+
+        if isinstance(data, dict) and "error" in data:
+            if data["error"] == "not_found":
+                ask_error_dialog(self.root, "L’URL n’existe pas ou est inaccessible.")
+                return
+            if data["error"] == "scrape_failed":
+                ask_error_dialog(self.root, "Impossible de scraper cette URL.")
+                return
+
         add_or_update_entry(data)
         self.url_entry.delete(0, "end")
+
         query = self.search_entry.get().strip()
         if query:
             self.search_query()

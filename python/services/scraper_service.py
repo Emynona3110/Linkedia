@@ -10,13 +10,20 @@ def scrape(url: str):
             timeout=10,
         )
     except Exception:
-        return None
+        return {"error": "not_found"}
+
+    if response.status_code == 404:
+        return {"error": "not_found"}
+
     if response.status_code != 200:
-        return None
+        return {"error": "scrape_failed"}
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    raw_html = response.content
+    soup = BeautifulSoup(raw_html, "html.parser", from_encoding=None)
 
-    title = soup.title.string.strip() if soup.title and soup.title.string else ""
+    title = ""
+    if soup.title and soup.title.string:
+        title = soup.title.string.strip()
 
     desc_tag = soup.find("meta", attrs={"name": "description"})
     description = ""
