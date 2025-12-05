@@ -1,5 +1,17 @@
+# Python
 __pycache__/
 *.pyc
-index.json
+*.pyo
+*.pyd
 .env
-*.exe
+
+# Virtual env
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+
+# Local data (favicons + index)
+data/

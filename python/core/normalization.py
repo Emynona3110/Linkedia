@@ -16,10 +16,14 @@ def normalize_entry(raw):
         title = raw.get("title") or raw.get("url") or ""
         url = raw.get("url") or ""
         description = raw.get("description") or ""
+        icon = raw.get("icon")
+        content = raw.get("content") or ""
         return {
             "title": title,
             "url": url,
-            "description": description
+            "description": description,
+            "icon": icon,
+            "content": content,
         }
 
     key = str(raw)
@@ -27,4 +31,4 @@ def normalize_entry(raw):
     if isinstance(entry, dict):
         return normalize_entry(entry)
 
-    return {"title": key, "url": key, "description": ""}
+    return {"title": key, "url": key, "description": "", "icon": None, "content": ""}

@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from PIL import Image
 
 
 class ResultCard:
@@ -13,7 +14,33 @@ class ResultCard:
 
         self.frame = ctk.CTkFrame(parent, corner_radius=10)
         self.frame.grid(row=row, column=0, padx=4, pady=4, sticky="ew")
-        self.frame.grid_columnconfigure(0, weight=1)
+        self.frame.grid_columnconfigure(1, weight=1)
+
+        self.icon_image = None
+        icon_path = entry.get("icon")
+
+        if icon_path:
+            try:
+                img = Image.open(icon_path).convert("RGBA")
+                self.icon_image = ctk.CTkImage(
+                    light_image=img,
+                    dark_image=img,
+                    size=(18, 18),
+                )
+            except Exception:
+                self.icon_image = None
+
+        if self.icon_image:
+            self.icon_label = ctk.CTkLabel(
+                self.frame,
+                image=self.icon_image,
+                text="",
+                width=20,
+            )
+            self.icon_label.grid(row=0, column=0, padx=(10, 5), pady=6, sticky="w")
+            title_col = 1
+        else:
+            title_col = 0
 
         title = entry.get("title") or entry.get("url") or ""
         description = entry.get("description") or ""
@@ -24,7 +51,7 @@ class ResultCard:
             anchor="w",
             font=ctk.CTkFont(size=13, weight="bold"),
         )
-        self.title_label.grid(row=0, column=0, padx=10, pady=(6, 0), sticky="w")
+        self.title_label.grid(row=0, column=title_col, padx=10, pady=(6, 0), sticky="w")
 
         self.desc_label = None
         if description:
@@ -37,7 +64,7 @@ class ResultCard:
                 anchor="w",
                 font=ctk.CTkFont(size=10),
             )
-            self.desc_label.grid(row=1, column=0, padx=10, pady=(0, 6), sticky="w")
+            self.desc_label.grid(row=1, column=title_col, padx=10, pady=(0, 6), sticky="w")
 
         self.score_label = ctk.CTkLabel(
             self.frame,
@@ -45,7 +72,7 @@ class ResultCard:
             anchor="w",
             font=ctk.CTkFont(size=10),
         )
-        self.score_label.grid(row=2, column=0, padx=10, pady=(0, 6), sticky="w")
+        self.score_label.grid(row=2, column=title_col, padx=10, pady=(0, 6), sticky="w")
 
         self.close_label = ctk.CTkLabel(
             self.frame,
@@ -54,7 +81,7 @@ class ResultCard:
             font=ctk.CTkFont(size=20),
             text_color=("gray50", "gray50"),
         )
-        self.close_label.grid(row=0, column=1, padx=8, pady=6, sticky="ne")
+        self.close_label.grid(row=0, column=2, padx=8, pady=6, sticky="ne")
 
         def on_enter(e):
             mode = ctk.get_appearance_mode()

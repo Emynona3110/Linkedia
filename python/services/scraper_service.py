@@ -1,12 +1,13 @@
 import requests
 from bs4 import BeautifulSoup
+from core.icon_manager import fetch_icon_for_website
 
 
 def scrape(url: str):
     try:
         response = requests.get(
             url,
-            headers={"User-Agent": "LinkediaBot/1.0"},
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
             timeout=10,
         )
     except Exception:
@@ -42,9 +43,12 @@ def scrape(url: str):
     if content and len(content) > 30000:
         content = content[:30000]
 
+    icon_local_path = fetch_icon_for_website(url)
+
     return {
         "url": url,
         "title": title,
         "description": description,
         "content": content,
+        "icon": icon_local_path,
     }
