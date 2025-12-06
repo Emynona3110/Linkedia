@@ -70,7 +70,7 @@ class ResultCard:
 
         self.score_label = ctk.CTkLabel(
             self.frame,
-            text=f"{score:.1f} %",
+            text=f"Score : {score:.1f}",
             anchor="w",
             font=ctk.CTkFont(size=10),
         )
