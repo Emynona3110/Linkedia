@@ -1,5 +1,6 @@
+customtkinter
+Pillow
 requests
 beautifulsoup4
 rapidfuzz
-pillow
-customtkinter
+deep-translator
