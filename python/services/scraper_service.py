@@ -1,52 +1,50 @@
 import requests
 from bs4 import BeautifulSoup
-from services.search_fallback import ddg_lookup
 from core.icon_manager import fetch_icon_for_website
+from services.search_fallback import ddg_lookup
+
 
 def scrape(url: str):
+    fallback = ddg_lookup(url)
+
+    if fallback and fallback.get("description"):
+        return {
+            "url": url,
+            "title": fallback.get("title") or "",
+            "description": fallback.get("description") or "",
+            "content": fallback.get("description") or "",
+            "icon": fetch_icon_for_website(url)
+        }
+
     try:
         response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        if response.status_code != 200:
+            raise Exception()
     except Exception:
-        fallback = ddg_lookup(url)
         if fallback:
-            fallback["url"] = url
-            fallback["icon"] = fetch_icon_for_website(url)
-            fallback["content"] = ""
-            return fallback
+            return {
+                "url": url,
+                "title": fallback.get("title") or "",
+                "description": fallback.get("description") or "",
+                "content": fallback.get("description") or "",
+                "icon": fetch_icon_for_website(url)
+            }
         return {"error": "not_found"}
 
-    if response.status_code != 200:
-        fallback = ddg_lookup(url)
-        if fallback:
-            fallback["url"] = url
-            fallback["icon"] = fetch_icon_for_website(url)
-            fallback["content"] = ""
-            return fallback
-        return {"error": "scrape_failed"}
-
-    raw_html = response.content
-    soup = BeautifulSoup(raw_html, "html.parser", from_encoding=None)
-
+    soup = BeautifulSoup(response.content, "html.parser")
     title = soup.title.string.strip() if soup.title and soup.title.string else ""
     desc_tag = soup.find("meta", attrs={"name": "description"})
-    description = desc_tag["content"].strip() if desc_tag and desc_tag.get("content") else ""
+    description = desc_tag.get("content", "").strip() if desc_tag else ""
 
-    for tag in soup(["script", "style", "noscript"]):
-        tag.decompose()
+    text = " ".join(soup.get_text(separator=" ").split())
 
-    text = soup.get_text(separator=" ", strip=True)
-    content = " ".join(text.split())
-    if not description and content:
-        description = content[:320]
-    if content and len(content) > 30000:
-        content = content[:30000]
-
-    icon_local_path = fetch_icon_for_website(url)
+    if not description and text:
+        description = text[:320]
 
     return {
         "url": url,
         "title": title,
         "description": description,
-        "content": content,
-        "icon": icon_local_path,
+        "content": description,
+        "icon": fetch_icon_for_website(url)
     }

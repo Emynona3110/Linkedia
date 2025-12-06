@@ -35,6 +35,14 @@ def delete_entry(url: str):
     data = load_index()
     uid = hash_url(url)
     if uid in data:
+        icon = data[uid].get("icon")
+        if icon:
+            p = Path(icon)
+            if p.exists():
+                try:
+                    p.unlink()
+                except:
+                    pass
         del data[uid]
         save_index(data)
         return True

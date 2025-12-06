@@ -10,12 +10,7 @@ ICON_DIR = BASE_DIR / "data" / "icons"
 ICON_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def get_icon_path(url: str):
-    h = md5(url.encode()).hexdigest()
-    return ICON_DIR / f"{h}.png"
-
-
-def get_domain(url: str) -> str:
+def get_domain(url: str):
     parsed = urlparse(url)
     domain = parsed.netloc or parsed.path
     if ":" in domain:
@@ -23,31 +18,56 @@ def get_domain(url: str) -> str:
     return domain
 
 
-def build_google_favicon_url(domain: str, size: int = 64) -> str:
-    return f"https://www.google.com/s2/favicons?domain={domain}&sz={size}"
+def icon_path(url: str):
+    h = md5(url.encode()).hexdigest()
+    return ICON_DIR / f"{h}.png"
 
 
-def download_and_convert_icon(icon_url: str, dest: Path):
+def try_download(url: str):
     try:
-        r = requests.get(icon_url, timeout=5)
+        r = requests.get(url, timeout=6)
         r.raise_for_status()
-        img = Image.open(BytesIO(r.content)).convert("RGBA")
-        img = img.resize((18, 18))
-        img.save(dest, format="PNG")
-        return True
+        return r.content
     except Exception:
-        return False
+        return None
+
+
+def save_as_png_32(data):
+    try:
+        img = Image.open(BytesIO(data)).convert("RGBA")
+        img = img.resize((32, 32), Image.LANCZOS)
+        out = BytesIO()
+        img.save(out, format="PNG")
+        return out.getvalue()
+    except Exception:
+        return None
 
 
 def fetch_icon_for_website(url: str):
     domain = get_domain(url)
     if not domain:
         return None
-    path = get_icon_path(url)
-    if path.exists():
-        return str(path)
-    icon_url = build_google_favicon_url(domain)
-    ok = download_and_convert_icon(icon_url, path)
-    if ok:
-        return str(path)
+
+    dest = icon_path(url)
+
+    sources = [
+        f"https://{domain}/favicon.ico",
+        f"https://api.faviconkit.com/{domain}/64",
+        f"https://www.google.com/s2/favicons?domain={domain}&sz=64",
+    ]
+
+    for src in sources:
+        data = try_download(src)
+        if not data:
+            continue
+
+        png_bytes = save_as_png_32(data)
+        if not png_bytes:
+            continue
+
+        with open(dest, "wb") as f:
+            f.write(png_bytes)
+
+        return str(dest)
+
     return None
