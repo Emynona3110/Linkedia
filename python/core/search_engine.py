@@ -1,21 +1,29 @@
 from rapidfuzz import fuzz
-from core.data_manager import list_entries
 from deep_translator import GoogleTranslator
+
+from core.data_manager import list_entries
+
+FUZZ_WEIGHT = 0.3
+FUZZ_MAX_BONUS = 20
+EXACT_CONTENT_SCORE = 100
+TITLE_MATCH_SCORE = 40
+MULTI_TOKEN_BONUS = 15
+DENSITY_FACTOR = 200
+MIN_SCORE = 5
+
 
 def clean_word(w):
     w = "".join(c for c in w.lower() if c.isalpha())
     return w if w else ""
 
+
 def tokenize(text):
     return [clean_word(w) for w in text.split() if clean_word(w)]
 
+
 def search(query: str):
     translated = GoogleTranslator(source="fr", target="en").translate(query).lower()
-    print("Query FR :", query)
-    print("Query EN :", translated)
-
     q_tokens = tokenize(translated)
-    print("Tokens :", q_tokens)
 
     data = list_entries()
     results = []
@@ -29,24 +37,24 @@ def search(query: str):
 
         for q in q_tokens:
             if q in content_tokens:
-                score += 100
+                score += EXACT_CONTENT_SCORE
                 matched += 1
             else:
                 fuzz_scores = [fuzz.partial_ratio(q, t) for t in content_tokens]
                 if fuzz_scores:
-                    score += min(max(fuzz_scores) * 0.3, 20)
+                    score += min(max(fuzz_scores) * FUZZ_WEIGHT, FUZZ_MAX_BONUS)
 
             if q in title_tokens:
-                score += 40
+                score += TITLE_MATCH_SCORE
 
         if len(q_tokens) > 1:
-            score += len(q_tokens) * 15
+            score += len(q_tokens) * MULTI_TOKEN_BONUS
 
         if content_tokens:
             density = matched / len(content_tokens)
-            score += density * 200
+            score += density * DENSITY_FACTOR
 
-        if score > 5:
+        if score > MIN_SCORE:
             results.append((score, entry))
 
     results.sort(reverse=True, key=lambda x: x[0])

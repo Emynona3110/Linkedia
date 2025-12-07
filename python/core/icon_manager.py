@@ -1,13 +1,20 @@
 import requests
-from pathlib import Path
 from hashlib import md5
 from urllib.parse import urlparse
-from PIL import Image
 from io import BytesIO
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-ICON_DIR = BASE_DIR / "data" / "icons"
-ICON_DIR.mkdir(parents=True, exist_ok=True)
+from PIL import Image
+
+from core.paths import ICON_DIR
+
+ICON_REQUEST_TIMEOUT = 6
+ICON_SIZE = (32, 32)
+
+FAVICON_SOURCES = [
+    "https://{domain}/favicon.ico",
+    "https://api.faviconkit.com/{domain}/64",
+    "https://www.google.com/s2/favicons?domain={domain}&sz=64",
+]
 
 
 def get_domain(url: str):
@@ -25,7 +32,7 @@ def icon_path(url: str):
 
 def try_download(url: str):
     try:
-        r = requests.get(url, timeout=6)
+        r = requests.get(url, timeout=ICON_REQUEST_TIMEOUT)
         r.raise_for_status()
         return r.content
     except Exception:
@@ -35,7 +42,7 @@ def try_download(url: str):
 def save_as_png_32(data):
     try:
         img = Image.open(BytesIO(data)).convert("RGBA")
-        img = img.resize((32, 32), Image.LANCZOS)
+        img = img.resize(ICON_SIZE, Image.LANCZOS)
         out = BytesIO()
         img.save(out, format="PNG")
         return out.getvalue()
@@ -50,13 +57,8 @@ def fetch_icon_for_website(url: str):
 
     dest = icon_path(url)
 
-    sources = [
-        f"https://{domain}/favicon.ico",
-        f"https://api.faviconkit.com/{domain}/64",
-        f"https://www.google.com/s2/favicons?domain={domain}&sz=64",
-    ]
-
-    for src in sources:
+    for template in FAVICON_SOURCES:
+        src = template.format(domain=domain)
         data = try_download(src)
         if not data:
             continue

@@ -10,12 +10,14 @@ from core.normalization import normalize_entry
 from ui.cards import ResultCard
 from ui.dialogs import ask_delete_dialog, ask_error_dialog
 
+WINDOW_GEOMETRY = "1100x580"
+
 
 class LinkediaApp:
     def __init__(self, root: ctk.CTk):
         self.root = root
         self.root.title("Linkedia")
-        self.root.geometry("1100x580")
+        self.root.geometry(WINDOW_GEOMETRY)
 
         self.current_results = []
         self.result_cards = []
@@ -213,7 +215,6 @@ class LinkediaApp:
             self.search_query()
         else:
             self.refresh_list()
-
 
     def search_query(self):
         query = self.search_entry.get().strip()

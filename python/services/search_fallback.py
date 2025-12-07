@@ -1,14 +1,22 @@
 import requests
 from bs4 import BeautifulSoup
-from pathlib import Path
 from hashlib import md5
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-ICON_DIR = BASE_DIR / "data" / "icons"
-ICON_DIR.mkdir(parents=True, exist_ok=True)
+from core.paths import ICON_DIR
+
+DDG_SEARCH_URL = "https://duckduckgo.com/html/"
+USER_AGENT = "Mozilla/5.0"
+SEARCH_TIMEOUT = 8
+ICON_TIMEOUT = 5
+
 
 def ddg_lookup(query: str):
-    r = requests.get("https://duckduckgo.com/html/", params={"q": query}, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+    r = requests.get(
+        DDG_SEARCH_URL,
+        params={"q": query},
+        timeout=SEARCH_TIMEOUT,
+        headers={"User-Agent": USER_AGENT},
+    )
     soup = BeautifulSoup(r.text, "html.parser")
     result = soup.select_one(".result")
     if not result:
@@ -30,7 +38,7 @@ def ddg_lookup(query: str):
         h = md5(query.encode()).hexdigest()
         dest = ICON_DIR / f"{h}.png"
         try:
-            img_data = requests.get(icon_url, timeout=5).content
+            img_data = requests.get(icon_url, timeout=ICON_TIMEOUT).content
             with open(dest, "wb") as f:
                 f.write(img_data)
             icon_path = str(dest)

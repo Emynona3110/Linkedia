@@ -1,12 +1,13 @@
 import customtkinter as ctk
 
+DIALOG_WIDTH = 300
+DIALOG_HEIGHT = 120
+DIALOG_WRAPLENGTH = 260
 
-def ask_delete_dialog(root: ctk.CTk, url: str, on_confirm):
-    if not url:
-        return
 
+def _create_dialog(root: ctk.CTk, title: str):
     dialog = ctk.CTkToplevel(root)
-    dialog.title("Confirmation")
+    dialog.title(title)
     dialog.resizable(False, False)
 
     try:
@@ -17,20 +18,27 @@ def ask_delete_dialog(root: ctk.CTk, url: str, on_confirm):
         pass
 
     dialog.update_idletasks()
-    dialog.geometry("300x120")
 
-    x = root.winfo_x() + (root.winfo_width() // 2) - 150
-    y = root.winfo_y() + (root.winfo_height() // 2) - 60
-    dialog.geometry(f"300x120+{x}+{y}")
+    x = root.winfo_x() + (root.winfo_width() // 2) - DIALOG_WIDTH // 2
+    y = root.winfo_y() + (root.winfo_height() // 2) - DIALOG_HEIGHT // 2
+    dialog.geometry(f"{DIALOG_WIDTH}x{DIALOG_HEIGHT}+{x}+{y}")
 
     dialog.grab_set()
+    return dialog
+
+
+def ask_delete_dialog(root: ctk.CTk, url: str, on_confirm):
+    if not url:
+        return
+
+    dialog = _create_dialog(root, "Confirmation")
 
     label = ctk.CTkLabel(
         dialog,
         text="Voulez-vous vraiment supprimer ce site ?",
         justify="center",
         anchor="center",
-        wraplength=260,
+        wraplength=DIALOG_WRAPLENGTH,
     )
     label.pack(pady=(15, 10))
 
@@ -61,32 +69,14 @@ def _confirm_and_close(dialog: ctk.CTkToplevel, url: str, on_confirm):
 
 
 def ask_error_dialog(root: ctk.CTk, message: str):
-    dialog = ctk.CTkToplevel(root)
-    dialog.title("Erreur")
-    dialog.resizable(False, False)
-
-    try:
-        dialog._apply_appearance_mode()
-        dialog._corner_radius = 8
-        dialog._border_width = 0
-    except Exception:
-        pass
-
-    dialog.update_idletasks()
-    dialog.geometry("300x120")
-
-    x = root.winfo_x() + (root.winfo_width() // 2) - 150
-    y = root.winfo_y() + (root.winfo_height() // 2) - 60
-    dialog.geometry(f"300x120+{x}+{y}")
-
-    dialog.grab_set()
+    dialog = _create_dialog(root, "Erreur")
 
     label = ctk.CTkLabel(
         dialog,
         text=message,
         justify="center",
         anchor="center",
-        wraplength=260,
+        wraplength=DIALOG_WRAPLENGTH,
     )
     label.pack(pady=(20, 15))
 

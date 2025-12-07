@@ -1,6 +1,17 @@
 import customtkinter as ctk
 from PIL import Image
 
+from utils.theme import get_mode
+
+CARD_CORNER_RADIUS = 10
+CARD_PADDING_X = 4
+CARD_PADDING_Y = 4
+ICON_SIZE = (20, 20)
+DESCRIPTION_MAX_LENGTH = 140
+SCORE_PREFIX = "Score : "
+CLOSE_TEXT = "×"
+CLOSE_FONT_SIZE = 20
+
 
 class ResultCard:
     def __init__(self, parent, row: int, index: int, score: float, entry: dict,
@@ -12,8 +23,8 @@ class ResultCard:
         self.on_delete = on_delete
         self.on_select = on_select
 
-        self.frame = ctk.CTkFrame(parent, corner_radius=10)
-        self.frame.grid(row=row, column=0, padx=4, pady=4, sticky="ew")
+        self.frame = ctk.CTkFrame(parent, corner_radius=CARD_CORNER_RADIUS)
+        self.frame.grid(row=row, column=0, padx=CARD_PADDING_X, pady=CARD_PADDING_Y, sticky="ew")
         self.frame.grid_columnconfigure(0, weight=1)
 
         self.icon_image = None
@@ -25,7 +36,7 @@ class ResultCard:
                 self.icon_image = ctk.CTkImage(
                     light_image=img,
                     dark_image=img,
-                    size=(20, 20),
+                    size=ICON_SIZE,
                 )
             except Exception:
                 self.icon_image = None
@@ -42,8 +53,8 @@ class ResultCard:
                 self.title_frame,
                 image=self.icon_image,
                 text="",
-                width=20,
-                height=20
+                width=ICON_SIZE[0],
+                height=ICON_SIZE[1],
             )
             self.icon_label.grid(row=0, column=0, padx=(0, 8), sticky="w")
 
@@ -58,8 +69,8 @@ class ResultCard:
         self.desc_label = None
         if description:
             short_desc = description.strip()
-            if len(short_desc) > 140:
-                short_desc = short_desc[:137] + "..."
+            if len(short_desc) > DESCRIPTION_MAX_LENGTH:
+                short_desc = short_desc[: DESCRIPTION_MAX_LENGTH - 3] + "..."
             self.desc_label = ctk.CTkLabel(
                 self.frame,
                 text=short_desc,
@@ -70,7 +81,7 @@ class ResultCard:
 
         self.score_label = ctk.CTkLabel(
             self.frame,
-            text=f"Score : {score:.1f}",
+            text=f"{SCORE_PREFIX}{score:.1f}",
             anchor="w",
             font=ctk.CTkFont(size=10),
         )
@@ -78,15 +89,15 @@ class ResultCard:
 
         self.close_label = ctk.CTkLabel(
             self.frame,
-            text="×",
+            text=CLOSE_TEXT,
             width=12,
-            font=ctk.CTkFont(size=20),
+            font=ctk.CTkFont(size=CLOSE_FONT_SIZE),
             text_color=("gray50", "gray50"),
         )
         self.close_label.grid(row=0, column=1, padx=8, pady=6, sticky="ne")
 
         def on_enter(e):
-            mode = ctk.get_appearance_mode()
+            mode = get_mode()
             self.close_label.configure(text_color="white" if mode == "Dark" else "black")
 
         def on_leave(e):

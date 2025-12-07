@@ -2,9 +2,7 @@ import json
 import hashlib
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-DATA_DIR = BASE_DIR / "data"
-INDEX_FILE = DATA_DIR / "index.json"
+from core.paths import INDEX_FILE, DATA_DIR
 
 
 def load_index():
@@ -41,7 +39,7 @@ def delete_entry(url: str):
             if p.exists():
                 try:
                     p.unlink()
-                except:
+                except Exception:
                     pass
         del data[uid]
         save_index(data)
