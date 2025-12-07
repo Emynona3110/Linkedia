@@ -1,6 +1,6 @@
 import webbrowser
 from tkinter import messagebox
-
+import threading
 import customtkinter as ctk
 
 from services.scraper_service import scrape
@@ -11,7 +11,6 @@ from ui.cards import ResultCard
 from ui.dialogs import ask_delete_dialog, ask_error_dialog
 
 WINDOW_GEOMETRY = "1100x580"
-
 
 class LinkediaApp:
     def __init__(self, root: ctk.CTk):
@@ -55,6 +54,7 @@ class LinkediaApp:
         self.content_frame = ctk.CTkFrame(self.root, fg_color="transparent")
         self.content_frame.grid(row=0, column=1, rowspan=4, sticky="nsew", padx=20, pady=20)
         self.content_frame.grid_columnconfigure(0, weight=1)
+        self.content_frame.grid_rowconfigure(3, weight=0)
         self.content_frame.grid_rowconfigure(2, weight=1)
 
         self.add_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
@@ -120,7 +120,28 @@ class LinkediaApp:
         self.results_container.grid(row=1, column=0, sticky="nsew")
         self.results_container.grid_columnconfigure(0, weight=1)
 
+        self.spinner = ctk.CTkProgressBar(self.content_frame, mode="indeterminate")
+        self.spinner.grid(row=3, column=0, pady=10)
+        self.spinner.grid_remove()
+
         self.refresh_list()
+
+    def run_async(self, fn):
+        thread = threading.Thread(target=fn)
+        thread.daemon = True
+        thread.start()
+
+    def start_loading(self):
+        self.spinner.grid()
+        self.spinner.start()
+        self.add_button.configure(state="disabled")
+        self.search_button.configure(state="disabled")
+
+    def stop_loading(self):
+        self.spinner.stop()
+        self.spinner.grid_remove()
+        self.add_button.configure(state="normal")
+        self.search_button.configure(state="normal")
 
     def change_appearance_mode_event(self, new_mode: str):
         ctk.set_appearance_mode(new_mode)
@@ -139,28 +160,15 @@ class LinkediaApp:
     def _scroll_to_top(self):
         try:
             self.results_container._parent_canvas.yview_moveto(0)
-        except Exception:
+        except:
             pass
 
     def refresh_list(self):
         entries = list_entries()
         self.clear_results()
 
-        values_iter = []
-        if isinstance(entries, dict):
-            values_iter = list(entries.values())[::-1]
-        elif isinstance(entries, (list, tuple, set)):
-            tmp = list(entries)
-            if tmp and isinstance(tmp[0], dict):
-                values_iter = tmp[::-1]
-            elif tmp and isinstance(tmp[0], (list, tuple)) and len(tmp[0]) >= 2:
-                values_iter = [e[1] for e in tmp[::-1]]
-            else:
-                values_iter = tmp[::-1]
-        else:
-            values_iter = [entries]
-
-        for raw in values_iter:
+        items = list(entries.values())[::-1]
+        for raw in items:
             data = normalize_entry(raw)
             self.current_results.append((0.0, data))
             index = len(self.current_results) - 1
@@ -181,47 +189,59 @@ class LinkediaApp:
 
     def normalize_url(self, url: str) -> str:
         url = url.strip()
-        if not url:
-            return ""
         if not url.startswith("http://") and not url.startswith("https://"):
             url = "https://" + url
         return url
 
     def add_url(self):
+        def task():
+            try:
+                self._add_url_internal()
+            finally:
+                self.root.after(0, self.stop_loading)
+
+        self.start_loading()
+        self.run_async(task)
+
+    def _add_url_internal(self):
         url = self.url_entry.get().strip()
         if not url:
-            messagebox.showwarning("Erreur", "Veuillez entrer une URL.")
+            self.root.after(0, lambda: messagebox.showwarning("Erreur", "Veuillez entrer une URL."))
             return
 
         url = self.normalize_url(url)
-
-        existing = get_entry(url)
-
         data = scrape(url)
 
         if isinstance(data, dict) and "error" in data:
             if data["error"] == "not_found":
-                ask_error_dialog(self.root, "L’URL n’existe pas ou est inaccessible.")
+                self.root.after(0, lambda: ask_error_dialog(self.root, "L’URL n’existe pas ou est inaccessible."))
                 return
             if data["error"] == "scrape_failed":
-                ask_error_dialog(self.root, "Impossible de scraper cette URL.")
+                self.root.after(0, lambda: ask_error_dialog(self.root, "Impossible de scraper cette URL."))
                 return
 
         add_or_update_entry(data)
-        self.url_entry.delete(0, "end")
+        self.root.after(0, lambda: self.url_entry.delete(0, "end"))
 
         query = self.search_entry.get().strip()
-        if query:
-            self.search_query()
-        else:
-            self.refresh_list()
+        self.root.after(0, self.search_query if query else self.refresh_list)
 
     def search_query(self):
-        query = self.search_entry.get().strip()
-        if not query:
-            self.refresh_list()
-            return
-        results = search(query)
+        def task():
+            try:
+                q = self.search_entry.get().strip()
+                if not q:
+                    self.root.after(0, self.refresh_list)
+                    return
+                results = search(q)
+                self.root.after(0, lambda: self._display_search_results(results))
+            finally:
+                self.root.after(0, self.stop_loading)
+
+        self.start_loading()
+        self.run_async(task)
+
+    def _display_search_results(self, results):
         self.clear_results()
         for score, entry in results:
             data = normalize_entry(entry)
@@ -249,11 +269,7 @@ class LinkediaApp:
             messagebox.showerror("Erreur", "Sélection invalide.")
             return None
         _, entry = self.current_results[self.selected_index]
-        url = entry.get("url")
-        if not url:
-            messagebox.showerror("Erreur", "URL introuvable pour cette entrée.")
-            return None
-        return url
+        return entry.get("url")
 
     def open_selected_from_card(self, index: int):
         self.select_card(index)
@@ -261,27 +277,21 @@ class LinkediaApp:
 
     def open_selected(self, event=None):
         url = self.get_selected_url()
-        if not url:
-            return
-        webbrowser.open(url)
+        if url:
+            webbrowser.open(url)
 
     def select_card(self, index: int):
-        if index < 0 or index >= len(self.current_results):
-            return
-        self.selected_index = index
-        self.update_card_styles()
+        if 0 <= index < len(self.current_results):
+            self.selected_index = index
+            self.update_card_styles()
 
     def ask_delete_url(self, url: str):
-        if not url:
-            return
-        ask_delete_dialog(self.root, url, self._confirm_delete)
+        if url:
+            ask_delete_dialog(self.root, url, self._confirm_delete)
 
     def _confirm_delete(self, url: str):
         if delete_entry(url):
-            query = self.search_entry.get().strip()
-            if query:
-                self.search_query()
-            else:
-                self.refresh_list()
+            q = self.search_entry.get().strip()
+            self.search_query() if q else self.refresh_list()
         else:
             messagebox.showerror("Erreur", "Impossible de supprimer.")
