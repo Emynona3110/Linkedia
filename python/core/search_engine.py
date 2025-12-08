@@ -1,7 +1,7 @@
 from rapidfuzz import fuzz
 from deep_translator import GoogleTranslator
-
 from core.data_manager import list_entries
+from core.normalization import clean_word, stem
 
 FUZZ_WEIGHT = 0.3
 FUZZ_MAX_BONUS = 20
@@ -11,19 +11,23 @@ MULTI_TOKEN_BONUS = 15
 DENSITY_FACTOR = 200
 MIN_SCORE = 5
 
-
-def clean_word(w):
-    w = "".join(c for c in w.lower() if c.isalpha())
-    return w if w else ""
-
-
 def tokenize(text):
-    return [clean_word(w) for w in text.split() if clean_word(w)]
-
+    out = []
+    for w in text.split():
+        c = clean_word(w)
+        if not c:
+            continue
+        out.append(stem(c))
+    return out
 
 def search(query: str):
     translated = GoogleTranslator(source="fr", target="en").translate(query).lower()
     q_tokens = tokenize(translated)
+
+    print("Recherche FR :", query)
+    print("Traduction EN :", translated)
+    print("Tokens utilisés :", q_tokens)
+    print("-" * 40)
 
     data = list_entries()
     results = []
@@ -36,7 +40,7 @@ def search(query: str):
         matched = 0
 
         for q in q_tokens:
-            if q in content_tokens:
+            if any(q in t for t in content_tokens):
                 score += EXACT_CONTENT_SCORE
                 matched += 1
             else:
@@ -44,7 +48,7 @@ def search(query: str):
                 if fuzz_scores:
                     score += min(max(fuzz_scores) * FUZZ_WEIGHT, FUZZ_MAX_BONUS)
 
-            if q in title_tokens:
+            if any(q in t for t in title_tokens):
                 score += TITLE_MATCH_SCORE
 
         if len(q_tokens) > 1:

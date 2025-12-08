@@ -1,90 +1,99 @@
 import requests
 from bs4 import BeautifulSoup
 from deep_translator import GoogleTranslator
+
 from core.icon_manager import fetch_icon_for_website
 from services.search_fallback import ddg_lookup
 from core.translation import translate_to_french
+from core.normalization import clean_word
 
-STOPWORDS = {
-    "the", "and", "for", "with", "from", "that", "this", "your", "yours", "their",
-    "there", "been", "into", "onto", "about", "above", "below", "under", "over",
-    "very", "much", "make", "makes", "made", "some", "many", "most", "such", "than",
-    "then", "they", "them", "were", "was", "are", "have", "here", "where", "when",
-    "who", "whom", "what", "why", "how", "one", "two", "three", "new", "news",
-    "like", "also", "more", "less", "just", "even", "only", "each", "other",
-    "others", "own", "same", "any", "all", "you", "we", "it", "its", "our", "of",
-    "in", "on", "to", "as", "at", "by", "be", "is", "an", "a"
-}
+DATAMUSE_URL = "https://api.datamuse.com/words"
+DATAMUSE_TIMEOUT = 5
+SCRAPE_TIMEOUT = 8
 
-def clean_word(w: str) -> str:
-    w = "".join(c for c in w.lower() if c.isalpha())
-    if not w:
-        return ""
-    if w in STOPWORDS:
-        return ""
-    return w
+SEM_LIMIT = 5
+SEM_BASE_WORDS = 3
 
-def datamuse_related(term: str, limit: int = 20) -> list[str]:
+
+def datamuse_related(term: str, limit: int = SEM_LIMIT) -> list[str]:
     try:
         r = requests.get(
-            "https://api.datamuse.com/words",
+            DATAMUSE_URL,
             params={"ml": term, "max": limit},
-            timeout=5,
+            timeout=DATAMUSE_TIMEOUT,
         )
         data = r.json()
-        out: list[str] = []
+        out = []
         for item in data:
             w = clean_word(item.get("word", ""))
             if w:
                 out.append(w)
         return out
-    except Exception:
+    except:
         return []
+
 
 def get_content_from_desc(desc: str) -> str:
     en = GoogleTranslator(source="auto", target="en").translate(desc)
-    base_words = [clean_word(w) for w in en.split()]
-    base_words = [w for w in base_words if w]
-    if not base_words:
-        return ""
+    base = [clean_word(w) for w in en.split() if clean_word(w)]
 
-    related_words: list[str] = []
-    for w in base_words:
-        related_words.extend(datamuse_related(w, limit=20))
+    related = []
+    for w in base[:SEM_BASE_WORDS]:
+        related.extend(datamuse_related(w, SEM_LIMIT))
 
-    all_words = sorted(set(base_words + related_words))
-    return " ".join(all_words)
+    related = [clean_word(w) for w in related if clean_word(w)]
+    all_words = sorted(set(base + related))
+
+    return " ".join(all_words[:400])
+
 
 def build_entry(url: str, title: str, description: str) -> dict:
-    fr_title = translate_to_french(title)
-    fr_desc = translate_to_french(description)
-    content = get_content_from_desc(fr_desc)
+    description_en = GoogleTranslator(source="auto", target="en").translate(description)
+    description_fr = translate_to_french(description)
+    content = get_content_from_desc(description_en)
     return {
         "url": url,
-        "title": fr_title,
-        "description": fr_desc,
+        "title": translate_to_french(title),
+        "description_fr": description_fr,
+        "description_en": description_en,
         "content": content,
         "icon": fetch_icon_for_website(url),
     }
 
+
 def scrape(url: str) -> dict:
     fb = ddg_lookup(url)
-    if fb and fb.get("description"):
-        return build_entry(url, fb.get("title") or "", fb.get("description") or "")
+    if fb and (fb.get("title") or fb.get("description")):
+        return build_entry(
+            url,
+            fb.get("title") or "",
+            fb.get("description") or ""
+        )
 
     try:
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+        r = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=SCRAPE_TIMEOUT,
+        )
         if r.status_code != 200:
             raise Exception()
-    except Exception:
+    except:
         if fb:
             return build_entry(url, fb.get("title") or "", fb.get("description") or "")
         return {"error": "not_found"}
 
     soup = BeautifulSoup(r.content, "html.parser")
+
+    for tag in soup.find_all("noscript"):
+        tag.decompose()
+
     title = soup.title.string.strip() if soup.title and soup.title.string else ""
-    tag = soup.find("meta", attrs={"name": "description"})
-    desc = tag.get("content", "").strip() if tag else ""
+    meta = soup.find("meta", attrs={"name": "description"})
+    desc = meta.get("content", "").strip() if meta else ""
+
+    if not title and not desc and fb:
+        return build_entry(url, fb.get("title") or "", fb.get("description") or "")
 
     text = " ".join(soup.get_text(separator=" ").split())
     if not desc and text:

@@ -42,7 +42,7 @@ class ResultCard:
                 self.icon_image = None
 
         title = entry.get("title") or entry.get("url") or ""
-        description = entry.get("description") or ""
+        description = entry.get("description_fr") or entry.get("description") or ""
 
         self.title_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
         self.title_frame.grid(row=0, column=0, padx=10, pady=(6, 0), sticky="w")
