@@ -2,6 +2,8 @@ import webbrowser
 from tkinter import messagebox
 import threading
 import customtkinter as ctk
+import os
+import sys
 
 from services.scraper_service import scrape
 from core.data_manager import add_or_update_entry, list_entries, get_entry, delete_entry
@@ -37,6 +39,13 @@ class LinkediaApp:
             font=ctk.CTkFont(size=20, weight="bold"),
         )
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.restart_button = ctk.CTkButton(
+            self.sidebar_frame,
+            text="Redémarrer",
+            command=self.restart_app
+        )
+        self.restart_button.grid(row=2, column=0, padx=20, pady=(10, 10), sticky="ew")
 
         self.rescrape_button = ctk.CTkButton(
             self.sidebar_frame,
@@ -86,7 +95,7 @@ class LinkediaApp:
 
         self.add_button = ctk.CTkButton(
             self.add_frame,
-            text="Ajouter / Mettre à jour",
+            text="Ajouter +",
             command=self.add_url,
         )
         self.add_button.grid(row=1, column=2, sticky="e")
@@ -153,6 +162,10 @@ class LinkediaApp:
         self.add_button.configure(state="normal")
         self.search_button.configure(state="normal")
         self.rescrape_button.configure(state="normal")
+
+    def restart_app(self):
+        python = sys.executable
+        os.execv(python, [python] + sys.argv)
 
     def rescrape_all(self):
         def task():
