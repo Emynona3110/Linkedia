@@ -1,8 +1,12 @@
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[2]
+
 DATA_DIR = BASE_DIR / "data"
 INDEX_FILE = DATA_DIR / "index.json"
-ICON_DIR = DATA_DIR / "icons"
 
+ICON_DIR = DATA_DIR / "icons"
 ICON_DIR.mkdir(parents=True, exist_ok=True)
+
+def relative_icon_path(filename: str) -> str:
+    return f"icons/{filename}"

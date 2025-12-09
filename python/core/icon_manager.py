@@ -5,7 +5,7 @@ from io import BytesIO
 
 from PIL import Image
 
-from core.paths import ICON_DIR
+from core.paths import ICON_DIR, relative_icon_path
 
 ICON_REQUEST_TIMEOUT = 6
 ICON_SIZE = (32, 32)
@@ -27,7 +27,7 @@ def get_domain(url: str):
 
 def icon_path(url: str):
     h = md5(url.encode()).hexdigest()
-    return ICON_DIR / f"{h}.png"
+    return ICON_DIR / f"{h}.png", f"{h}.png"
 
 
 def try_download(url: str):
@@ -55,7 +55,7 @@ def fetch_icon_for_website(url: str):
     if not domain:
         return None
 
-    dest = icon_path(url)
+    dest_abs, filename = icon_path(url)
 
     for template in FAVICON_SOURCES:
         src = template.format(domain=domain)
@@ -67,9 +67,9 @@ def fetch_icon_for_website(url: str):
         if not png_bytes:
             continue
 
-        with open(dest, "wb") as f:
+        with open(dest_abs, "wb") as f:
             f.write(png_bytes)
 
-        return str(dest)
+        return relative_icon_path(filename)
 
     return None

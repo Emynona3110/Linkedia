@@ -7,6 +7,8 @@ from services.scraper_service import scrape
 from core.data_manager import add_or_update_entry, list_entries, get_entry, delete_entry
 from core.search_engine import search
 from core.normalization import normalize_entry
+from core.paths import ICON_DIR
+
 from ui.cards import ResultCard
 from ui.dialogs import ask_delete_dialog, ask_error_dialog
 
@@ -27,7 +29,7 @@ class LinkediaApp:
 
         self.sidebar_frame = ctk.CTkFrame(self.root, width=140, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(5, weight=1)
+        self.sidebar_frame.grid_rowconfigure(10, weight=1)
 
         self.logo_label = ctk.CTkLabel(
             self.sidebar_frame,
@@ -35,6 +37,13 @@ class LinkediaApp:
             font=ctk.CTkFont(size=20, weight="bold"),
         )
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.rescrape_button = ctk.CTkButton(
+            self.sidebar_frame,
+            text="Re-scraper tous",
+            command=self.rescrape_all
+        )
+        self.rescrape_button.grid(row=1, column=0, padx=20, pady=(10, 10), sticky="ew")
 
         self.appearance_mode_label = ctk.CTkLabel(
             self.sidebar_frame,
@@ -136,12 +145,32 @@ class LinkediaApp:
         self.spinner.start()
         self.add_button.configure(state="disabled")
         self.search_button.configure(state="disabled")
+        self.rescrape_button.configure(state="disabled")
 
     def stop_loading(self):
         self.spinner.stop()
         self.spinner.grid_remove()
         self.add_button.configure(state="normal")
         self.search_button.configure(state="normal")
+        self.rescrape_button.configure(state="normal")
+
+    def rescrape_all(self):
+        def task():
+            try:
+                entries = list_entries()  # {hash: entry}
+                for entry in entries.values():
+                    real_url = entry.get("url")
+                    if not real_url:
+                        continue
+                    real_url = self.normalize_url(real_url)
+                    data = scrape(real_url)
+                    add_or_update_entry(data)
+                self.root.after(0, self.refresh_list)
+            finally:
+                self.root.after(0, self.stop_loading)
+
+        self.start_loading()
+        self.run_async(task)
 
     def change_appearance_mode_event(self, new_mode: str):
         ctk.set_appearance_mode(new_mode)
@@ -290,7 +319,20 @@ class LinkediaApp:
             ask_delete_dialog(self.root, url, self._confirm_delete)
 
     def _confirm_delete(self, url: str):
+        entry = get_entry(url)
+
         if delete_entry(url):
+            if entry:
+                icon_path = entry.get("icon")
+                if icon_path:
+                    filename = icon_path.split("/")[-1]
+                    abs_icon = ICON_DIR / filename
+                    try:
+                        if abs_icon.exists():
+                            abs_icon.unlink()
+                    except:
+                        pass
+
             q = self.search_entry.get().strip()
             self.search_query() if q else self.refresh_list()
         else:

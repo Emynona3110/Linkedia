@@ -54,33 +54,46 @@ def build_entry(url: str, title: str, description: str) -> dict:
         "icon": fetch_icon_for_website(url),
     }
 
+def build_entry_minimal(url: str) -> dict:
+    return {
+        "url": url,
+        "title": url,
+        "description_fr": "",
+        "description_en": "",
+        "tokens_en": "",
+        "semantic": "",
+        "icon": fetch_icon_for_website(url),
+    }
+
 def scrape(url: str) -> dict:
     fb = ddg_lookup(url)
-    if fb and (fb.get("title") or fb.get("description")):
-        return build_entry(url, fb.get("title") or "", fb.get("description") or "")
+    title_fb = fb.get("title") if fb else None
+    desc_fb = fb.get("description") if fb else None
 
     try:
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=SCRAPE_TIMEOUT)
-        if r.status_code != 200:
-            raise Exception()
-    except:
-        if fb:
-            return build_entry(url, fb.get("title") or "", fb.get("description") or "")
-        return {"error": "not_found"}
+        status = r.status_code
+    except Exception:
+        status = None
+        r = None
 
-    soup = BeautifulSoup(r.content, "html.parser")
-    for tag in soup.find_all("noscript"):
-        tag.decompose()
+    if status and status == 200:
+        soup = BeautifulSoup(r.content, "html.parser")
+        for tag in soup.find_all("noscript"):
+            tag.decompose()
 
-    title = soup.title.string.strip() if soup.title and soup.title.string else ""
-    meta = soup.find("meta", attrs={"name": "description"})
-    desc = meta.get("content", "").strip() if meta else ""
+        title = soup.title.string.strip() if soup.title and soup.title.string else title_fb
+        meta = soup.find("meta", attrs={"name": "description"})
+        desc = meta.get("content", "").strip() if meta else desc_fb
 
-    if not title and not desc and fb:
-        return build_entry(url, fb.get("title") or "", fb.get("description") or "")
+        if not desc:
+            text = " ".join(soup.get_text(separator=" ").split())
+            desc = text[:320] if text else desc_fb
+    else:
+        title = title_fb
+        desc = desc_fb
 
-    text = " ".join(soup.get_text(separator=" ").split())
-    if not desc and text:
-        desc = text[:320]
+    if not title and not desc:
+        return build_entry_minimal(url)
 
     return build_entry(url, title, desc)

@@ -1,7 +1,9 @@
 import customtkinter as ctk
 from PIL import Image
+from pathlib import Path
 
 from utils.theme import get_mode
+from core.paths import DATA_DIR
 
 CARD_CORNER_RADIUS = 10
 CARD_PADDING_X = 4
@@ -31,18 +33,20 @@ class ResultCard:
         icon_path = entry.get("icon")
 
         if icon_path:
-            try:
-                img = Image.open(icon_path).convert("RGBA")
-                self.icon_image = ctk.CTkImage(
-                    light_image=img,
-                    dark_image=img,
-                    size=ICON_SIZE,
-                )
-            except Exception:
-                self.icon_image = None
+            abs_icon_path = DATA_DIR / icon_path
+            if abs_icon_path.exists():
+                try:
+                    img = Image.open(abs_icon_path).convert("RGBA")
+                    self.icon_image = ctk.CTkImage(
+                        light_image=img,
+                        dark_image=img,
+                        size=ICON_SIZE,
+                    )
+                except Exception:
+                    self.icon_image = None
 
         title = entry.get("title") or entry.get("url") or ""
-        description = entry.get("description_fr") or entry.get("description") or ""
+        description = entry.get("description_fr") or ""
 
         self.title_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
         self.title_frame.grid(row=0, column=0, padx=10, pady=(6, 0), sticky="w")
@@ -67,10 +71,10 @@ class ResultCard:
         self.title_label.grid(row=0, column=1, sticky="w")
 
         self.desc_label = None
-        if description:
+        if description and description.strip():
             short_desc = description.strip()
             if len(short_desc) > DESCRIPTION_MAX_LENGTH:
-                short_desc = short_desc[: DESCRIPTION_MAX_LENGTH - 3] + "..."
+                short_desc = short_desc[:DESCRIPTION_MAX_LENGTH - 3] + "..."
             self.desc_label = ctk.CTkLabel(
                 self.frame,
                 text=short_desc,
